@@ -1,6 +1,4 @@
 
-import { GoogleGenAI } from "@google/genai";
-
 // From types.ts
 export interface SkillCategory {
   category: string;
@@ -156,10 +154,16 @@ export const PROJECTS: Project[] = [
 ];
 
 
-// --- CHATBOT CONTEXT ---
-export const RESUME_CONTEXT = `
-You are an AI assistant for Nishad Wankhede. Your goal is to answer questions about him based on his resume information provided below. Be friendly, concise, and professional.
+// --- AI MODEL CONTEXT AND SETUP ---
+const HF_API_URL = "https://nishadwankhede1-ishad-portfolio-api.hf.space/generate";
 
+const CHATBOT_SYSTEM_INSTRUCTION = `
+You are an AI assistant for Nishad Wankhede. Your goal is to answer questions about him based ONLY on his resume information provided in the prompt. Be friendly, concise, and professional.
+
+**CRITICAL RULE:** If a question is asked that cannot be answered from the provided resume text, you MUST politely decline to answer and state that your knowledge is limited to the information in Nishad's resume. Do NOT use any external knowledge or make up information. Respond in plain text and do not use markdown formatting like ** for bolding.
+`;
+
+const RESUME_RAW_TEXT = `
 **NISHAD WANKHEDE'S RESUME:**
 
 **Contact:**
@@ -209,59 +213,65 @@ Results-driven Business Intelligence Analyst with 3+ years' experience convertin
 - K. K. Wagh Institute of Engineering Education & Research, Nashik
 `;
 
+const BI_INSIGHT_CONTEXT = `You are a dual-mode AI assistant. Analyze the user's prompt to determine which mode to use. Respond in plain text and do not use markdown formatting like ** for bolding.
 
-// --- MOCK IMPLEMENTATION FOR TESTING ---
-// The following code simulates the AI responses to avoid needing an API key.
+**Mode 1: Senior Business Intelligence Analyst (Default)**
+If the user provides a business question (e.g., "How can we increase customer retention?"), your goal is to help them frame it analytically. Provide a structured response that includes:
+1.  Problem Reframing: A clear, analyzable problem statement.
+2.  Key Metrics/KPIs: A bulleted list of 3-4 crucial metrics.
+3.  Suggested Visualizations: A bulleted list of chart types.
+4.  Analysis Steps: A numbered list of steps to analyze the problem.
 
-// const API_KEY = process.env.API_KEY;
+**Mode 2: Resume Assistant**
+If the user's question is about Nishad Wankhede's resume (which is provided in the prompt), answer the question directly and concisely based ONLY on the resume text. Do not provide a business analysis framework for resume questions.
+`;
 
-// if (!API_KEY) {
-//     throw new Error("API_KEY environment variable not set.");
-// }
+/**
+ * A generic function to call the self-hosted Hugging Face model.
+ * @param prompt The complete prompt to send to the model.
+ * @returns The model's response text.
+ */
+const callHuggingFaceModel = async (prompt: string): Promise<string> => {
+    try {
+        const response = await fetch(HF_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ prompt }),
+        });
 
-// const ai = new GoogleGenAI({ apiKey: API_KEY });
+        if (!response.ok) {
+            // This could happen if the HF Space is sleeping, building, or has an error.
+            throw new Error(`The AI assistant returned an error: ${response.statusText}`);
+        }
 
-export const askNishadBot = async (query: string, context: string): Promise<string> => {
-    console.log("Mock askNishadBot called with query:", query);
-    // Simulate network delay
-    await new Promise(res => setTimeout(res, 500)); 
-    
-    const mockResponse = "This is a mock response for testing. Nishad is skilled in Power BI, SQL, and Python. He has over 3 years of experience as a Business Intelligence Analyst. He is currently working at Russell Investments.";
-    return mockResponse;
+        const data = await response.json();
+        return data.response || "Sorry, I received an empty response.";
+
+    } catch (error) {
+        console.error("Failed to call Hugging Face API:", error);
+        // Provide a user-friendly error message
+        throw new Error("The AI assistant is currently unavailable. It might be starting up. Please try again in a minute.");
+    }
 };
 
+/**
+ * Asks the chatbot a question using the self-hosted model.
+ * @param query The user's question.
+ * @returns The bot's answer.
+ */
+export const askNishadBot = async (query: string): Promise<string> => {
+    const fullPrompt = `${CHATBOT_SYSTEM_INSTRUCTION}\n\n--- RESUME START ---\n${RESUME_RAW_TEXT}\n--- RESUME END ---\n\nQuestion: ${query}`;
+    return callHuggingFaceModel(fullPrompt);
+};
 
-const BI_INSIGHT_CONTEXT = `You are a senior Business Intelligence Analyst. Your goal is to help users frame business problems analytically.
-When given a business question, you should provide a structured response using markdown. Your response should include:
-1.  **Problem Reframing:** A clear, analyzable problem statement.
-2.  **Key Metrics/KPIs:** A bulleted list of 3-4 crucial metrics.
-3.  **Recommended Visualizations:** A bulleted list of 2-3 effective chart types.
-4.  **Analysis Steps:** A brief, high-level outline of the steps or data required.
-Keep your response concise, professional, and well-formatted.`;
-
+/**
+ * Generates BI insights using the self-hosted model.
+ * @param prompt The business problem from the user.
+ * @returns A structured analytical framework or a direct answer.
+ */
 export const generateBiInsights = async (prompt: string): Promise<string> => {
-    console.log("Mock generateBiInsights called with prompt:", prompt);
-    // Simulate network delay
-    await new Promise(res => setTimeout(res, 800));
-
-    const mockResponse = `
-**Problem Reframing:**
-How can we identify and reduce the key drivers of customer churn to improve overall retention rates?
-
-**Key Metrics/KPIs:**
-*   Monthly Churn Rate (%)
-*   Customer Lifetime Value (CLV)
-*   Customer Satisfaction Score (CSAT) by segment
-
-**Recommended Visualizations:**
-*   A line chart showing churn rate over time.
-*   A bar chart comparing CLV for retained vs. churned customers.
-*   A treemap visualizing reasons for churn cited in exit surveys.
-
-**Analysis Steps:**
-1.  Consolidate customer data from CRM and subscription platforms.
-2.  Develop a cohort analysis to track retention over time.
-3.  Build a classification model to predict at-risk customers.
-    `;
-    return mockResponse;
+    const fullPrompt = `${BI_INSIGHT_CONTEXT}\n\nHere is the resume for context:\n\n--- RESUME START ---\n${RESUME_RAW_TEXT}\n--- RESUME END ---\n\nUser's Request: ${prompt}`;
+    return callHuggingFaceModel(fullPrompt);
 };

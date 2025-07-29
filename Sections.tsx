@@ -11,7 +11,6 @@ import {
     EMAIL,
     GITHUB_URL,
     LINKEDIN_URL,
-    RESUME_CONTEXT,
     askNishadBot,
     generateBiInsights,
     Project,
@@ -728,7 +727,7 @@ export const InsightGenerator: React.FC = () => {
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      setError('Please enter a business question.');
+      setError('Please enter a question.');
       return;
     }
     setIsLoading(true);
@@ -754,9 +753,9 @@ export const InsightGenerator: React.FC = () => {
       transition={{ duration: 0.6 }}
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-        <InsightSectionTitle>AI-Powered BI Insight Generator</InsightSectionTitle>
+        <InsightSectionTitle>AI-Powered Nishad Assistant</InsightSectionTitle>
         <p className="text-center text-[var(--text-secondary)] max-w-2xl mx-auto mb-12">
-          Stuck on a business problem? Enter a question below and my Gemini-powered assistant will help you frame it analytically by suggesting key metrics, visualizations, and analysis steps.
+          For any query, talk to my assistant. It can answer questions about my resume or help you frame business problems analytically.
         </p>
         <div className="max-w-3xl mx-auto">
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
@@ -764,7 +763,7 @@ export const InsightGenerator: React.FC = () => {
               type="text"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="e.g., How can we increase customer retention?"
+              placeholder="Ask me anything..."
               className="flex-grow bg-white/70 border border-[var(--border-color)] text-[var(--text-primary)] rounded-lg p-3 focus:ring-2 focus:ring-[var(--accent-green)] focus:outline-none transition"
               disabled={isLoading}
             />
@@ -901,10 +900,10 @@ export const Chatbot: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const botResponse = await askNishadBot(userInput, RESUME_CONTEXT);
+      const botResponse = await askNishadBot(userInput);
       setMessages(prev => [...prev, { text: botResponse, sender: 'bot' }]);
     } catch (error) {
-      setMessages(prev => [...prev, { text: "Sorry, I'm having trouble connecting right now.", sender: 'bot' }]);
+      setMessages(prev => [...prev, { text: error instanceof Error ? error.message : "Sorry, I'm having trouble connecting right now.", sender: 'bot' }]);
     } finally {
       setIsLoading(false);
     }
